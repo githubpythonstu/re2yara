@@ -1,0 +1,24 @@
+# Copyright (C) 2025 Orange
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+
+"""
+CVE checker for iputils
+
+https://www.cvedetails.com/product/898/Iputils-Iputils.html?vendor_id=520
+https://www.cvedetails.com/product/150862/Iputils-Project-Iputils.html?vendor_id=31725
+
+"""
+from __future__ import annotations
+
+from cve_bin_tool.checkers import Checker
+
+
+class IputilsChecker(Checker):
+    CONTAINS_PATTERNS: list[str] = []
+    FILENAME_PATTERNS: list[str] = []
+    VERSION_PATTERNS = [
+        r"([0-9]+)\r?\n[a-z, ]*iputils",
+        r"iputils[A-Za-z0-9 \-\r\n]*\r?\n([0-9]+)\r?\n",
+    ]
+    VENDOR_PRODUCT = [("iputils", "iputils"), ("iputils_project", "iputils")]
