@@ -1,0 +1,23 @@
+# Copyright (C) 2025 Orange
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+
+"""
+CVE checker for musl
+
+https://www.cvedetails.com/product/39652/Musl-libc-Musl.html?vendor_id=16859
+
+"""
+from __future__ import annotations
+
+from cve_bin_tool.checkers import Checker
+
+
+class MuslChecker(Checker):
+    CONTAINS_PATTERNS: list[str] = []
+    FILENAME_PATTERNS: list[str] = []
+    VERSION_PATTERNS = [
+        r"([0-9]+\.[0-9]+\.[0-9]+)[ -~\t\r\n]*MUSL_LOCPATH",
+        r"musl libc[ -~\t\r\n]*\r?\n([0-9]+\.[0-9]+\.[0-9]+)",
+    ]
+    VENDOR_PRODUCT = [("musl-libc", "musl")]
