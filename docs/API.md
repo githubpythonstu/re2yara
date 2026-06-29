@@ -1,6 +1,8 @@
 # RE2YARA API Reference
 
 > 本文档详细说明 RE2YARA 转换器的内部 API 和代码结构。
+> 
+> 版本: 1.1 | 更新日期: 2026-06-29
 
 ---
 
@@ -12,6 +14,8 @@
 - [数据结构和类型](#数据结构和类型)
 - [正则转换管道](#正则转换管道)
 - [配置选项](#配置选项)
+- [异常处理](#异常处理)
+- [使用示例](#使用示例)
 
 ---
 
@@ -533,4 +537,131 @@ suite.generate_test_report(Path("test_report.md"))
 
 ---
 
-*文档版本: 1.0 | 更新日期: 2026-06-29*
+## 异常处理
+
+### 转换器异常
+
+| 异常场景 | 处理方式 | 返回值 |
+|---------|---------|--------|
+| 文件不存在 | 打印错误，跳过 | `None` |
+| AST 解析失败 | 打印错误，跳过 | `None` |
+| 无 Checker 类 | 打印警告，跳过 | `None` |
+| 正则转换错误 | 记录差异，继续 | 部分转换结果 |
+| 写入失败 | 打印错误 | `False` |
+
+### 测试异常
+
+| 异常场景 | 处理方式 |
+|---------|---------|
+| YARA 二进制不存在 | `FileNotFoundError` |
+| 编译超时 (30s) | 记录 "Compilation timeout" |
+| 扫描超时 (15s) | 记录 "Scan timeout" |
+| 编译失败 | 记录 stderr 错误信息 |
+
+### 错误处理示例
+
+```python
+# 转换器错误处理
+class RE2YARAVersionOnlyConverter:
+    def convert_file(self, source_file, args=None):
+        try:
+            class_info = self.extract_class_info(source_file, args)
+            if not class_info:
+                return False  # 提取失败
+            
+            yara_rule = self.generate_yara_rule(class_info)
+            # ... 写入文件 ...
+            return True
+            
+        except Exception as e:
+            # 记录失败
+            failure_note = {
+                'type': 'conversion_failure',
+                'source_file': source_file.name,
+                'error': str(e),
+                'traceback': traceback.format_exc(),
+            }
+            self.conversion_stats['regex_difference_notes'].append(failure_note)
+            return False
+```
+
+---
+
+## 使用示例
+
+### 完整转换流程
+
+```python
+#!/usr/bin/env python3
+"""完整的 RE2YARA 转换和测试流程示例"""
+
+from pathlib import Path
+from re2yara_version_only_converter import (
+    RE2YARAVersionOnlyConverter,
+    YARATestSuite
+)
+
+# 步骤 1: 转换
+print("=" * 50)
+print("步骤 1: 转换 Python Checkers 到 YARA 规则")
+print("=" * 50)
+
+converter = RE2YARAVersionOnlyConverter(
+    source_dir="checkers/",
+    target_dir="output_yara/"
+)
+converter.convert_all()
+converter.generate_regex_difference_report()
+
+# 步骤 2: 测试
+print("\n" + "=" * 50)
+print("步骤 2: 测试生成的 YARA 规则")
+print("=" * 50)
+
+suite = YARATestSuite(
+    yara_binary_path="bin/yara64.exe",
+    yarac_binary_path="bin/yarac64.exe"
+)
+results = suite.test_all_yara_rules(Path("output_yara/"))
+
+# 步骤 3: 生成报告
+print("\n" + "=" * 50)
+print("步骤 3: 生成测试报告")
+print("=" * 50)
+
+suite.generate_test_report(Path("test_report.md"))
+
+# 步骤 4: 输出统计
+summary = results['summary']
+print(f"\n测试完成!")
+print(f"  总规则数: {summary['total_rules']}")
+print(f"  语法通过: {summary['syntax_passed']}")
+print(f"  功能通过: {summary['functional_passed']}")
+```
+
+### 批量处理示例
+
+```python
+import os
+from pathlib import Path
+
+# 批量转换多个目录
+directories = [
+    ("checkers/crypto/", "output/crypto/"),
+    ("checkers/network/", "output/network/"),
+    ("checkers/system/", "output/system/"),
+]
+
+for source, target in directories:
+    if not os.path.exists(source):
+        print(f"跳过不存在的目录: {source}")
+        continue
+    
+    converter = RE2YARAVersionOnlyConverter(source, target)
+    converter.convert_all()
+    print(f"转换完成: {source} → {target}")
+```
+
+---
+
+*文档版本: 1.1 | 更新日期: 2026-06-29*
