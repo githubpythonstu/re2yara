@@ -27,6 +27,7 @@ A powerful Python tool that converts regular expression patterns from Intel's CV
 - [Usage](#usage)
 - [Conversion Process](#conversion-process)
 - [Testing](#testing)
+- [Branch Protection / Rulesets](#branch-protection--rulesets)
 - [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -43,8 +44,8 @@ A powerful Python tool that converts regular expression patterns from Intel's CV
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-repo/re2yara-v1.git
-   cd re2yara-v1
+   git clone https://github.com/githubpythonstu/re2yara.git
+   cd re2yara
    ```
 
 2. **Verify YARA binaries** (included in `bin/` directory)
@@ -155,9 +156,9 @@ py file_filter_dedup.py [OPTIONS]
 ## 📁 Project Structure
 
 ```
-re2yara-v1/
+re2yara/
 ├── checkers/                        # 434 Python checker files from Intel CVE Binary Tool
-│   ├── __init__.py                  # 10,546 lines of combined checker code
+│   ├── __init__.py                  # Checker base class with metaclass
 │   ├── accountsservice.py           # Software detection patterns
 │   ├── acpid.py                    # ACPI daemon patterns
 │   └── ...                         # 432 more checker files
@@ -176,6 +177,9 @@ re2yara-v1/
 ├── bin/                           # YARA 4.2.3 binaries for Windows
 │   ├── yara64.exe                 # YARA scanning engine
 │   └── yarac64.exe                # YARA compiler
+├── .claude/                       # Claude Code project configuration
+│   ├── settings.local.json        # Local Claude settings
+│   └── skills/re2yara/SKILL.md    # Claude Code skill for this project
 ├── file_filter_dedup.py           # File filtering and deduplication script
 ├── re2yara_version_only_converter.py # Main converter with testing suite
 ├── re2yara_converter.py            # Full pattern converter
@@ -397,6 +401,60 @@ bin/yara64.exe target_yara_version_only/software_name.yara /path/to/test/file
 bin/yara64.exe -r target_yara_version_only/ /path/to/scan/directory
 ```
 
+## 🔒 Branch Protection / Rulesets
+
+This repository uses **GitHub Rulesets** to enforce code quality through mandatory pull requests.
+
+### Ruleset Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| **Target branches** | `main` | Applies to the main branch |
+| **Enforcement** | Active | Rules are enforced immediately |
+| **Pull requests** | Required | All changes must go through PR |
+| **Merge commits** | Disabled | Only squash or rebase merges allowed |
+
+### Why Rulesets Exist
+
+- **Code Review**: All changes are reviewed before merging
+- **Quality Control**: Automated checks run on every PR
+- **Audit Trail**: Full history of who changed what and why
+- **Collaboration**: Team members can discuss changes before they land
+
+### Workflow with Rulesets
+
+```bash
+# 1. Create a feature branch (NEVER push directly to main)
+git checkout -b feature/my-new-checker
+
+# 2. Make your changes
+# ... edit files ...
+
+# 3. Stage and commit
+git add .
+git commit -m "Add new checker for FooBar software"
+
+# 4. Push the feature branch
+git push origin feature/my-new-checker
+
+# 5. Open a Pull Request on GitHub
+# 6. Wait for review and CI checks
+# 7. Merge via squash or rebase
+```
+
+### Bypass Rules
+
+Repository administrators can bypass rulesets in emergency situations. Use this responsibility wisely.
+
+### Troubleshooting Ruleset Issues
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Push to main rejected | Ruleset requires PR | Push to a feature branch instead |
+| PR cannot be merged | Required checks failing | Fix CI issues, ensure tests pass |
+| Ruleset not triggering | Wrong branch pattern | Check ruleset target includes your branch |
+| "Permission denied" on push | Authentication issue | Use PAT with `repo` scope or SSH key |
+
 ## 📊 Examples
 
 ### Example 1: Basic Conversion
@@ -567,6 +625,28 @@ ModuleNotFoundError: No module named 'ast'
 - Use Python 3.8+ (ast module is part of standard library)
 - Check Python installation: `py --version`
 
+#### Git Authentication Failed (403)
+```
+remote: Permission to user/repo.git denied to username.
+fatal: unable to access 'https://github.com/...': The requested URL returned error: 403
+```
+
+**Cause**: GitHub no longer supports password authentication for Git operations.
+
+**Solutions:**
+1. **Use Personal Access Token (PAT)**:
+   - Generate token at GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+   - Check `repo` scope
+   - Use token as password when pushing
+
+2. **Switch to SSH**:
+   ```bash
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+   # Add public key to GitHub → Settings → SSH and GPG keys
+   git remote set-url origin git@github.com:user/repo.git
+   git push
+   ```
+
 ### Performance Optimization
 
 #### Enhanced Pattern Performance
@@ -642,7 +722,7 @@ The file filtering process is optimized for efficiency:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our contribution guidelines:
+We welcome contributions! Please follow our contribution guidelines:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
@@ -650,12 +730,33 @@ We welcome contributions! Please see our contribution guidelines:
 4. Push to branch: `git push origin feature-name`
 5. Submit a pull request
 
+> **Note**: Direct pushes to `main` are blocked by Ruleset. All changes must go through a Pull Request.
+
 ### Development Guidelines
 
 - Follow PEP 8 for Python code style
 - Add appropriate tests for new features
 - Update documentation for API changes
 - Ensure all tests pass before submitting
+
+### Adding New Checkers
+
+To add a new software checker:
+
+1. Create `checkers/mynewsoftware.py`:
+```python
+from cve_bin_tool.checkers import Checker
+
+class MynewsoftwareChecker(Checker):
+    CONTAINS_PATTERNS = [r"unique string in binary"]
+    FILENAME_PATTERNS = [r"mynewsoftware"]
+    VERSION_PATTERNS = [r"mynewsoftware[ /]([0-9]+\.[0-9]+\.[0-9]+)"]
+    VENDOR_PRODUCT = [("vendor_name", "mynewsoftware")]
+```
+
+2. Run the converter to generate the YARA rule
+3. Test the generated rule against a real binary sample
+4. Submit a PR with the new checker
 
 ## 📄 License
 
@@ -683,6 +784,7 @@ This project is licensed under the GPL-3.0-or-later License. See the [LICENSE](L
 - [Test Results](yara_comprehensive_test_report.md)
 - [YARA Documentation](https://yara.readthedocs.io/)
 - [Python AST Documentation](https://docs.python.org/3/library/ast.html)
+- [GitHub Rulesets Documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
 
 ---
 
